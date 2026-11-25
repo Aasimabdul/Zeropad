@@ -1,0 +1,17 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+
+# .NET
+**/bin/
+**/obj/
+.vs/
+*.user
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
