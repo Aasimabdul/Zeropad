@@ -98,7 +98,7 @@ private fun ControllerScreen() {
                 if (ack.received) {
                     hostSeen = true
                     latencyMs = ack.roundTripMs
-                    status = "Connected · authenticated"
+                    status = if (ack.virtualOutput) "Connected · Xbox controller active" else "Connected · virtual driver unavailable"
                 } else {
                     if (hostSeen) {
                         hostSeen = false
