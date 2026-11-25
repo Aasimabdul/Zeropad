@@ -57,6 +57,10 @@ The optional backend requires a separate ViGEmBus driver installation. ViGEmBus 
 - Wi-Fi/USB/driver behavior has not been certified on physical Windows 10/11 systems.
 - A green CI build is compilation/test evidence only; it is not hardware certification.
 
+## Verification
+
+See [the hardware acceptance and latency test plan](docs/test-plan.md) for the required Windows 10/11, USB/Wi-Fi, reconnect, and performance checks. Hardware tests are not claimed as complete.
+
 ## License and contribution
 
 The repository uses GPL-3.0. Third-party dependencies retain their own licenses. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
