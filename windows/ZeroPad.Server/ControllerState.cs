@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace ZeroPad.Server;
 
-internal sealed record ControllerState(
+public sealed record ControllerState(
     long Sequence,
     IReadOnlySet<string> Buttons,
     float LeftX,
