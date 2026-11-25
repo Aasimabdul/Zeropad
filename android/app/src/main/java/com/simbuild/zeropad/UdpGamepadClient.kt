@@ -84,7 +84,6 @@ internal class UdpGamepadClient {
         udp.send(DatagramPacket(envelope, envelope.size, address, PORT))
     }
 
-    @Synchronized
     fun receiveAck(): Boolean {
         val udp = socket ?: return false
         val secret = key ?: return false
