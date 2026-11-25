@@ -72,14 +72,15 @@ internal static class Program
                 inputNeutral = false;
             }
 
-            var ackMac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"ack\n{packet.Session:D}\n{state.Sequence}"));
+            var virtualOutput = controller is not null;
+            var ackMac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"ack\n{packet.Session:D}\n{state.Sequence}\n{virtualOutput.ToString().ToLowerInvariant()}"));
             return JsonSerializer.SerializeToUtf8Bytes(new
             {
                 type = "ack",
                 session = packet.Session.ToString("D"),
                 sequence = state.Sequence,
                 mac = Convert.ToBase64String(ackMac),
-                virtualOutput = controller is not null
+                virtualOutput
             });
         }
 
