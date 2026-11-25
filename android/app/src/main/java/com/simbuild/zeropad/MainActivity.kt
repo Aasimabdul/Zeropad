@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -60,6 +61,7 @@ private fun ControllerScreen() {
     var host by remember { mutableStateOf("") }
     var pairingKey by remember { mutableStateOf("") }
     var connected by remember { mutableStateOf(false) }
+    var transportReady by remember { mutableStateOf(false) }
     var hostSeen by remember { mutableStateOf(false) }
     var latencyMs by remember { mutableStateOf<Long?>(null) }
     var status by remember { mutableStateOf("Not connected") }
@@ -74,6 +76,8 @@ private fun ControllerScreen() {
 
     LaunchedEffect(connected) {
         if (!connected) return@LaunchedEffect
+        var latestSnapshot: GamepadSnapshot? = null
+
         launch {
             snapshotFlow {
                 GamepadSnapshot(
@@ -85,15 +89,48 @@ private fun ControllerScreen() {
                     leftTrigger = if ("LT" in pressed) 1f else 0f,
                     rightTrigger = if ("RT" in pressed) 1f else 0f
                 )
-            }.collectLatest { snapshot ->
-                while (isActive) {
-                    withContext(Dispatchers.IO) { client.send(snapshot) }
-                    delay(50)
-                }
-            }
+            }.collect { latestSnapshot = it }
         }
+
         launch {
             while (isActive) {
+                val snapshot = latestSnapshot
+                if (snapshot != null) {
+                    if (!transportReady) {
+                        try {
+                            withContext(Dispatchers.IO) { client.connect(host, pairingKey, transport) }
+                            transportReady = true
+                            status = "Transport ready · waiting for host"
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (error: Exception) {
+                            status = "Reconnect failed: ${error.message ?: "check cable/network"}"
+                            delay(500)
+                            continue
+                        }
+                    }
+                    try {
+                        withContext(Dispatchers.IO) { client.send(snapshot) }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        transportReady = false
+                        hostSeen = false
+                        latencyMs = null
+                        status = "Transport interrupted · reconnecting"
+                        withContext(Dispatchers.IO) { client.close() }
+                    }
+                }
+                delay(if (transportReady) 50 else 500)
+            }
+        }
+
+        launch {
+            while (isActive) {
+                if (!transportReady) {
+                    delay(100)
+                    continue
+                }
                 val ack = withContext(Dispatchers.IO) { client.receiveAck() }
                 if (ack.received) {
                     hostSeen = true
@@ -161,13 +198,16 @@ private fun ControllerScreen() {
                 onClick = {
                     if (connected) {
                         connected = false
+                        transportReady = false
                         hostSeen = false
+                        latencyMs = null
                         status = "Not connected"
                         client.close()
                     } else {
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) { client.connect(host, pairingKey, transport) }
+                                transportReady = true
                                 hostSeen = false
                                 connected = true
                                 status = "Waiting for authenticated host response"
