@@ -9,14 +9,12 @@ namespace ZeroPad.Server;
 internal static class Program
 {
     private const int Port = 26760;
-    private const int MaxDatagramBytes = 4096;
-    private static readonly TimeSpan MessageLifetime = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan SessionIdleTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan InputTimeout = TimeSpan.FromSeconds(1);
 
     public static async Task Main()
     {
-        Console.WriteLine("ZeroPad Windows companion — Wi-Fi transport prototype");
+        Console.WriteLine("ZeroPad Windows companion — authenticated UDP prototype");
         Console.WriteLine("Use only on a trusted private LAN. Do not forward this port to the internet.");
 
         var key = LoadOrCreatePairingKey();
@@ -31,7 +29,7 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Virtual controller unavailable: {ex.GetType().Name}. Install the separately licensed driver only if you accept its maintenance status.");
+            Console.WriteLine($"Virtual controller unavailable: {ex.GetType().Name}. Authenticated input will be diagnostic-only until a compatible driver is installed.");
         }
 
         using var stop = new CancellationTokenSource();
@@ -69,73 +67,45 @@ internal static class Program
         {
             while (!stop.IsCancellationRequested)
             {
-                UdpReceiveResult packet;
-                try { packet = await udp.ReceiveAsync(stop.Token); }
+                UdpReceiveResult datagram;
+                try { datagram = await udp.ReceiveAsync(stop.Token); }
                 catch (OperationCanceledException) { break; }
-
-                if (packet.Buffer.Length == 0 || packet.Buffer.Length > MaxDatagramBytes)
-                {
-                    Console.WriteLine("Rejected empty or oversized datagram.");
-                    continue;
-                }
 
                 try
                 {
-                    var envelope = JsonDocument.Parse(packet.Buffer);
-                    using (envelope)
+                    var packet = AuthenticatedPacket.Parse(datagram.Buffer, key, DateTimeOffset.UtcNow);
+                    var state = packet.State;
+                    lock (gate)
                     {
-                        var root = envelope.RootElement;
-                        if (root.ValueKind != JsonValueKind.Object) throw new FormatException("Envelope must be an object.");
-                        var sessionText = RequiredString(root, "session");
-                        if (!Guid.TryParseExact(sessionText, "D", out var session)) throw new FormatException("Invalid session ID.");
-                        var sentAt = RequiredInt64(root, "sentAt");
-                        var payload = RequiredString(root, "payload");
-                        var suppliedMac = Convert.FromBase64String(RequiredString(root, "mac"));
+                        var now = DateTimeOffset.UtcNow;
+                        if (activeSession == packet.Session && state.Sequence <= lastSequence)
+                            throw new FormatException("Stale sequence.");
+                        if (activeSession is not null && activeSession != packet.Session &&
+                            now - lastSeen <= SessionIdleTimeout)
+                            throw new FormatException("Another controller session is active.");
 
-                        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        if (sentAt < now - (long)MessageLifetime.TotalMilliseconds || sentAt > now + (long)MessageLifetime.TotalMilliseconds)
-                            throw new FormatException("Expired message.");
-
-                        var signedBytes = Encoding.UTF8.GetBytes($"{session:D}\n{sentAt}\n{payload}");
-                        var expectedMac = HMACSHA256.HashData(key, signedBytes);
-                        if (suppliedMac.Length != expectedMac.Length ||
-                            !CryptographicOperations.FixedTimeEquals(suppliedMac, expectedMac))
-                            throw new FormatException("Authentication failed.");
-
-                        var stateJson = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-                        var state = ControllerState.Parse(stateJson);
-
-                        lock (gate)
-                        {
-                            var nowUtc = DateTimeOffset.UtcNow;
-                            if (activeSession == session && state.Sequence <= lastSequence)
-                                throw new FormatException("Stale sequence.");
-                            if (activeSession is not null && activeSession != session &&
-                                nowUtc - lastSeen <= SessionIdleTimeout)
-                                throw new FormatException("Another controller session is active.");
-
-                            activeSession = session;
-                            lastSequence = state.Sequence;
-                            lastSeen = nowUtc;
-                            controller?.Apply(state);
-                            inputNeutral = false;
-                        }
-
-                        var ackMac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"ack\\n{session:D}\\n{state.Sequence}"));
-                        var ack = JsonSerializer.SerializeToUtf8Bytes(new
-                        {
-                            type = "ack",
-                            session = session.ToString("D"),
-                            sequence = state.Sequence,
-                            mac = Convert.ToBase64String(ackMac)
-                        });
-                        await udp.SendAsync(ack, packet.RemoteEndPoint, stop.Token);
+                        activeSession = packet.Session;
+                        lastSequence = state.Sequence;
+                        lastSeen = now;
+                        controller?.Apply(state);
+                        inputNeutral = false;
                     }
+
+                    var ackMac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"ack\n{packet.Session:D}\n{state.Sequence}"));
+                    var ack = JsonSerializer.SerializeToUtf8Bytes(new
+                    {
+                        type = "ack",
+                        session = packet.Session.ToString("D"),
+                        sequence = state.Sequence,
+                        mac = Convert.ToBase64String(ackMac)
+                    });
+                    await udp.SendAsync(ack, datagram.RemoteEndPoint, stop.Token);
                 }
                 catch (Exception ex) when (ex is JsonException or FormatException or ArgumentException or InvalidOperationException or CryptographicException)
                 {
                     Console.WriteLine($"Rejected input: {ex.Message}");
                 }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested) { break; }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Input processing error: {ex.GetType().Name}");
@@ -166,19 +136,5 @@ internal static class Program
         var key = RandomNumberGenerator.GetBytes(32);
         File.WriteAllText(path, Convert.ToBase64String(key));
         return key;
-    }
-
-    private static string RequiredString(JsonElement root, string name)
-    {
-        if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String)
-            throw new FormatException($"Missing or invalid field: {name}");
-        return value.GetString()!;
-    }
-
-    private static long RequiredInt64(JsonElement root, string name)
-    {
-        if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var number))
-            throw new FormatException($"Missing or invalid field: {name}");
-        return number;
     }
 }
