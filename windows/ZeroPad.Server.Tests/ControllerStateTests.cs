@@ -83,7 +83,7 @@ public sealed class ControllerStateTests
     private static byte[] BuildPacket(byte[] key, Guid session, long sentAt, string stateJson)
     {
         var payload = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(stateJson));
-        var signed = System.Text.Encoding.UTF8.GetBytes($"{session:D}\\n{sentAt}\\n{payload}");
+        var signed = System.Text.Encoding.UTF8.GetBytes($"{session:D}\n{sentAt}\n{payload}");
         var mac = System.Security.Cryptography.HMACSHA256.HashData(key, signed);
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
