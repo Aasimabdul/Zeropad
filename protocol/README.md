@@ -1,16 +1,16 @@
 # ZeroPad protocol v1 (draft)
 
-The protocol is transport-neutral at the state-model level. Current Wi-Fi transport uses authenticated UDP datagrams on port **26760**. USB is not implemented.
+The controller state model is transport-neutral. Wi-Fi uses authenticated UDP datagrams on port **26760**. USB cable mode uses newline-framed authenticated JSON over TCP on Windows loopback port **26761**, reached from Android via `adb reverse tcp:26761 tcp:26761`. Both paths validate the same envelope and state payload.
 
 ## Pairing key
 
-On first launch, the Windows companion generates a random 32-byte key and saves its Base64 representation under the current user's Local AppData folder. It prints the key once per launch for manual entry into the Android app. Treat it as a password. Reset pairing by stopping the companion and deleting `%LOCALAPPDATA%\ZeroPad\pairing.key`, then restarting it.
+On first launch, Windows generates a random 32-byte key and saves its Base64 representation under the current user's Local AppData folder. It prints the key for manual entry into Android. Treat it as a password. Reset pairing by stopping the companion and deleting `%LOCALAPPDATA%\ZeroPad\pairing.key`, then restarting it.
 
-The server listens on all local interfaces but requires a valid HMAC-SHA256 on every packet. Use a trusted private LAN, allow the port only on Windows Private networks, and never port-forward it to the public internet. Packets are authenticated, not encrypted; this protocol is intended for a trusted LAN, not an untrusted network.
+Wi-Fi requires a trusted private LAN. Packets are authenticated, not encrypted; never port-forward UDP 26760 to the public internet. USB mode requires Android USB debugging, ADB platform-tools, and the reverse mapping command above.
 
-## Datagram envelope
+## Authenticated envelope
 
-The UDP datagram is UTF-8 JSON, maximum 4096 bytes:
+The envelope is UTF-8 JSON, maximum 4096 bytes:
 
 ```json
 {
@@ -21,7 +21,7 @@ The UDP datagram is UTF-8 JSON, maximum 4096 bytes:
 }
 ```
 
-The HMAC is computed over the UTF-8 bytes of `session + newline + sentAt + newline + payload`, using the 32-byte pairing key. The `payload` field is Base64 of the state JSON. Windows verifies the MAC in constant time, rejects timestamps outside ±10 seconds, and rejects stale sequence numbers within the active session. Only one active controller session is accepted at a time. A valid message is acknowledged with a MAC-authenticated response.
+HMAC-SHA256 covers UTF-8 bytes of `session + newline + sentAt + newline + payload`, using the 32-byte pairing key. The payload field is Base64 of the state JSON. Windows verifies the MAC in constant time, rejects timestamps outside ±10 seconds, and rejects stale sequence numbers within the active session. Only one active controller session is accepted at a time. A valid message is acknowledged with a MAC-authenticated response.
 
 ## State payload
 
@@ -51,8 +51,6 @@ The HMAC is computed over the UTF-8 bytes of `session + newline + sentAt + newli
 
 ## Acknowledgement
 
-The host responds with `type=ack`, the same session ID and state sequence, and a Base64 HMAC-SHA256 of `ack + newline + session + newline + sequence`. The Android client uses the authenticated acknowledgement to display host response status.
+The host responds with `type=ack`, the same session ID and state sequence, and a Base64 HMAC-SHA256 of `ack + newline + session + newline + sequence`. Android uses the authenticated acknowledgement to display host response status and network round-trip time.
 
-## Versioning
-
-Breaking changes require a protocol version increment and compatibility notes. USB transport must reuse the same state model and validation rules.
+Breaking changes require a version increment and compatibility notes.
