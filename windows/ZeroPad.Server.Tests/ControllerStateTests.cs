@@ -41,4 +41,53 @@ public sealed class ControllerStateTests
     {
         Assert.ThrowsAny<System.Text.Json.JsonException>(() => ControllerState.Parse("{"));
     }
+
+    [Fact]
+    public void AuthenticatedPacketAcceptsValidMac()
+    {
+        var key = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var now = DateTimeOffset.FromUnixTimeMilliseconds(1795630000000);
+        var session = Guid.NewGuid();
+        var payload = Valid;
+        var packet = BuildPacket(key, session, now.ToUnixTimeMilliseconds(), payload);
+        var parsed = AuthenticatedPacket.Parse(packet, key, now);
+        Assert.Equal(session, parsed.Session);
+        Assert.Equal(12, parsed.State.Sequence);
+    }
+
+    [Fact]
+    public void AuthenticatedPacketRejectsTamperedMac()
+    {
+        var key = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var now = DateTimeOffset.UtcNow;
+        var session = Guid.NewGuid();
+        var packet = BuildPacket(key, session, now.ToUnixTimeMilliseconds(), Valid);
+        packet[packet.Length - 4] ^= 0x40;
+        Assert.ThrowsAny<Exception>(() => AuthenticatedPacket.Parse(packet, key, now));
+    }
+
+    [Fact]
+    public void AuthenticatedPacketRejectsExpiredTimestamp()
+    {
+        var key = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var now = DateTimeOffset.UtcNow;
+        var session = Guid.NewGuid();
+        var packet = BuildPacket(key, session, now.ToUnixTimeMilliseconds() - 60000, Valid);
+        Assert.Throws<FormatException>(() => AuthenticatedPacket.Parse(packet, key, now));
+    }
+
+    private static byte[] BuildPacket(byte[] key, Guid session, long sentAt, string stateJson)
+    {
+        var payload = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(stateJson));
+        var signed = System.Text.Encoding.UTF8.GetBytes($"{session:D}\\n{sentAt}\\n{payload}");
+        var mac = System.Security.Cryptography.HMACSHA256.HashData(key, signed);
+        return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            session = session.ToString("D"),
+            sentAt,
+            payload,
+            mac = Convert.ToBase64String(mac)
+        });
+    }
+
 }
