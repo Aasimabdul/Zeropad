@@ -2,7 +2,11 @@
 
 Target framework: .NET 8. The companion receives authenticated Wi-Fi UDP controller snapshots on port 26760 and authenticated USB/ADB-reverse TCP frames on loopback port 26761. It optionally maps state to an Xbox 360/XInput virtual controller.
 
-## Build and run
+## Get a test build
+
+The Windows CI workflow builds and tests the solution, then publishes a self-contained Windows x64 companion as the `zeropad-windows-x64` workflow artifact. Open the latest successful [Windows CI run](https://github.com/Aasimabdul/Zeropad/actions/workflows/windows.yml), select the run for the `dev/zeropad-foundation` branch, and download the artifact. It is a short-lived developer test build, not a signed installer.
+
+## Build and run from source
 
 From the repository root:
 
