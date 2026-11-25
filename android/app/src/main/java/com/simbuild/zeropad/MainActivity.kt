@@ -77,15 +77,13 @@ private fun ControllerScreen() {
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                PadButton("Y", pressed.contains("Y")) { update(pressed, "Y", it) }
                 Row {
-                    PadButton("Y", pressed.contains("Y")) { update(pressed, "Y", it) }
                     PadButton("X", pressed.contains("X")) { update(pressed, "X", it) }
-                }
-                Row {
-                    PadButton("X", pressed.contains("X_FACE")) { update(pressed, "X_FACE", it) }
-                    PadButton("A", pressed.contains("A")) { update(pressed, "A", it) }
+                    Spacer(Modifier.width(40.dp))
                     PadButton("B", pressed.contains("B")) { update(pressed, "B", it) }
                 }
+                PadButton("A", pressed.contains("A")) { update(pressed, "A", it) }
             }
         }
 
