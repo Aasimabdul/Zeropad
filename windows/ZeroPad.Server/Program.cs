@@ -49,20 +49,11 @@ internal static class Program
                 }
                 try
                 {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
-                    if (root.ValueKind != JsonValueKind.Object ||
-                        !root.TryGetProperty("version", out var version) ||
-                        version.ValueKind != JsonValueKind.Number || version.GetInt32() != 1 ||
-                        !root.TryGetProperty("type", out var type) ||
-                        type.GetString() != "state")
-                    {
-                        Console.WriteLine("Rejected unsupported message.");
-                        continue;
-                    }
-                    Console.WriteLine("Protocol v1 state received (diagnostic only).");
+                    var state = ControllerState.Parse(line);
+                    Console.WriteLine($"Accepted state #{state.Sequence}: {state.Buttons.Count} buttons.");
                 }
                 catch (JsonException) { Console.WriteLine("Rejected malformed JSON."); }
+                catch (FormatException ex) { Console.WriteLine($"Rejected controller state: {ex.Message}"); }
                 catch (InvalidOperationException) { Console.WriteLine("Rejected invalid field type."); }
             }
             Console.WriteLine("Diagnostic client disconnected.");
