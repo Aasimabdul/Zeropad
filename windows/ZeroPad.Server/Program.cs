@@ -93,7 +93,7 @@ internal static class Program
                         var suppliedMac = Convert.FromBase64String(RequiredString(root, "mac"));
 
                         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        if (Math.Abs(now - sentAt) > (long)MessageLifetime.TotalMilliseconds)
+                        if (sentAt < now - (long)MessageLifetime.TotalMilliseconds || sentAt > now + (long)MessageLifetime.TotalMilliseconds)
                             throw new FormatException("Expired message.");
 
                         var signedBytes = Encoding.UTF8.GetBytes($"{session:D}\n{sentAt}\n{payload}");
@@ -120,6 +120,16 @@ internal static class Program
                             controller?.Apply(state);
                             inputNeutral = false;
                         }
+
+                        var ackMac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"ack\\n{session:D}\\n{state.Sequence}"));
+                        var ack = JsonSerializer.SerializeToUtf8Bytes(new
+                        {
+                            type = "ack",
+                            session = session.ToString("D"),
+                            sequence = state.Sequence,
+                            mac = Convert.ToBase64String(ackMac)
+                        });
+                        await udp.SendAsync(ack, packet.RemoteEndPoint, stop.Token);
                     }
                 }
                 catch (Exception ex) when (ex is JsonException or FormatException or ArgumentException or InvalidOperationException or CryptographicException)
