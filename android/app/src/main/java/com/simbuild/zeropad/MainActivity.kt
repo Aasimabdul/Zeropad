@@ -60,6 +60,7 @@ private fun ControllerScreen() {
     var pairingKey by remember { mutableStateOf("") }
     var connected by remember { mutableStateOf(false) }
     var hostSeen by remember { mutableStateOf(false) }
+    var latencyMs by remember { mutableStateOf<Long?>(null) }
     var status by remember { mutableStateOf("Not connected") }
     var leftX by remember { mutableFloatStateOf(0f) }
     var leftY by remember { mutableFloatStateOf(0f) }
@@ -92,12 +93,14 @@ private fun ControllerScreen() {
         }
         launch {
             while (isActive) {
-                val acknowledged = withContext(Dispatchers.IO) { client.receiveAck() }
-                if (acknowledged) {
+                val ack = withContext(Dispatchers.IO) { client.receiveAck() }
+                if (ack.received) {
                     hostSeen = true
+                    latencyMs = ack.roundTripMs
                     status = "Connected · authenticated"
                 } else if (hostSeen) {
                     hostSeen = false
+                    latencyMs = null
                     status = "Host not responding"
                 }
             }
@@ -156,11 +159,12 @@ private fun ControllerScreen() {
                 modifier = Modifier.fillMaxWidth()
             ) { Text(if (connected) "Disconnect" else "Connect") }
             Text(status, fontSize = 11.sp, color = if (hostSeen) Ink else Muted)
+            Text("Network RTT: ${latencyMs?.let { "$it ms" } ?: "—"}", fontSize = 11.sp, color = Muted)
             Text("Both devices must be on the same trusted private network. UDP port 26760.", fontSize = 10.sp, color = Muted)
         }
 
         Text("Controller", fontSize = 17.sp, color = Ink)
-        Text("Hold buttons · drag sticks · triggers are pressure-style on/off in this preview", fontSize = 11.sp, color = Muted)
+        Text("Hold buttons · drag sticks · triggers are digital on/off", fontSize = 11.sp, color = Muted)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             StickPad("LEFT STICK", leftX, leftY, onAxis = { x, y -> leftX = x; leftY = y })
             StickPad("RIGHT STICK", rightX, rightY, onAxis = { x, y -> rightX = x; rightY = y })
@@ -196,7 +200,7 @@ private fun ControllerScreen() {
         Text("Diagnostics", fontSize = 14.sp, color = Ink)
         Text("Buttons: ${pressed.joinToString().ifEmpty { "none" }}", fontSize = 11.sp, color = Muted)
         Text("L: ${axisText(leftX)}, ${axisText(leftY)}    R: ${axisText(rightX)}, ${axisText(rightY)}", fontSize = 11.sp, color = Muted)
-        Text("Network sends at 20 Hz with authenticated snapshots. Latency measurements and USB are not implemented yet.", fontSize = 11.sp, color = Muted)
+        Text("Network sends authenticated snapshots at 20 Hz. RTT is phone-to-host-and-back, not total game input latency. USB is not implemented yet.", fontSize = 11.sp, color = Muted)
     }
 }
 
