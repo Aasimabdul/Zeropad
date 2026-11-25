@@ -62,7 +62,13 @@ internal static class Program
                 activeSession = packet.Session;
                 lastSequence = state.Sequence;
                 lastSeen = now;
-                controller?.Apply(state);
+                try { controller?.Apply(state); }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Virtual controller failed: {ex.GetType().Name}; disabling virtual output.");
+                    try { controller?.Dispose(); } catch { }
+                    controller = null;
+                }
                 inputNeutral = false;
             }
 
@@ -72,7 +78,8 @@ internal static class Program
                 type = "ack",
                 session = packet.Session.ToString("D"),
                 sequence = state.Sequence,
-                mac = Convert.ToBase64String(ackMac)
+                mac = Convert.ToBase64String(ackMac),
+                virtualOutput = controller is not null
             });
         }
 
