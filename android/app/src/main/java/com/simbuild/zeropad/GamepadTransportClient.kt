@@ -58,19 +58,29 @@ internal class GamepadTransportClient {
 
         if (selectedMode == TransportMode.USB) {
             val socket = Socket()
-            socket.soTimeout = 250
-            socket.connect(InetSocketAddress("127.0.0.1", USB_PORT), 1500)
-            tcp = socket
-            tcpReader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-            tcpWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
+            try {
+                socket.soTimeout = 250
+                socket.connect(InetSocketAddress("127.0.0.1", USB_PORT), 1500)
+                tcp = socket
+                tcpReader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+                tcpWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
+            } catch (error: Exception) {
+                try { socket.close() } catch (_: Exception) { }
+                throw error
+            }
         } else {
             require(host.trim().isNotEmpty()) { "Enter the Windows host IP address." }
             val resolved = InetAddress.getByName(host.trim())
             val socket = DatagramSocket()
-            socket.soTimeout = 250
-            socket.connect(resolved, WIFI_PORT)
-            udp = socket
-            address = resolved
+            try {
+                socket.soTimeout = 250
+                socket.connect(resolved, WIFI_PORT)
+                udp = socket
+                address = resolved
+            } catch (error: Exception) {
+                socket.close()
+                throw error
+            }
         }
 
         key = decodedKey
