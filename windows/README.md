@@ -1,8 +1,8 @@
 # Windows companion
 
-Target framework: .NET 8. The companion receives authenticated UDP controller snapshots on port 26760 and optionally maps them to an Xbox 360/XInput virtual controller.
+Target framework: .NET 8. The companion receives authenticated Wi-Fi UDP controller snapshots on port 26760 and authenticated USB/ADB-reverse TCP frames on loopback port 26761. It optionally maps state to an Xbox 360/XInput virtual controller.
 
-## Build
+## Build and run
 
 From the repository root:
 
@@ -16,6 +16,16 @@ On first launch, the companion generates a 32-byte pairing key and prints it to 
 
 Allow UDP port 26760 only on Windows Private networks if the firewall prompts. Do not expose the port to Public networks or forward it through a router.
 
+## USB mode
+
+Enable USB debugging on Android, connect the cable, authorize the computer, and run:
+
+```powershell
+adb reverse tcp:26761 tcp:26761
+```
+
+Select USB in the Android connection panel. The USB path is TCP forwarded by ADB to a loopback-only listener; it is not native USB HID. The ADB command must be re-established when needed.
+
 ## Virtual controller driver
 
 The optional Xbox 360 backend uses the managed `Nefarius.ViGEm.Client` package. A separate ViGEmBus driver installation is required. The upstream driver was retired/archived in 2023, so ZeroPad does not bundle its installer and does not claim it is a long-term maintained dependency. Review [driver evaluation](../docs/driver-evaluation.md) before use.
@@ -24,7 +34,7 @@ If the driver is absent or unavailable, the server still accepts authenticated i
 
 ## Current limitations
 
-- Wi-Fi UDP transport and authenticated snapshots are implemented in the foundation branch, but real-device end-to-end tests are still required.
+- Wi-Fi and USB/ADB-reverse transport code has not yet been verified on physical devices.
 - Pairing uses a manually copied shared key; packets are authenticated but not encrypted.
-- USB/ADB transport, QR pairing, a tray UI/installer, analog-pressure triggers, and automated driver installation are not implemented.
+- QR pairing, tray UI/installer, analog-pressure triggers, and automated driver installation are not implemented.
 - Hardware latency and Windows 10/11 compatibility have not been certified.
