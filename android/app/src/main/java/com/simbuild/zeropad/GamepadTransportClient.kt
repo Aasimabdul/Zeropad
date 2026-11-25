@@ -151,7 +151,7 @@ internal class GamepadTransportClient {
             val ackSequence = ack.optLong("sequence", -1L)
             val virtualOutput = ack.optBoolean("virtualOutput", false)
             val supplied = Base64.decode(ack.optString("mac"), Base64.DEFAULT)
-            val expected = hmac(secret, "ack\n$session\n$ackSequence".toByteArray(Charsets.UTF_8))
+            val expected = hmac(secret, "ack\n$session\n$ackSequence\n${virtualOutput.toString()}".toByteArray(Charsets.UTF_8))
             if (!java.security.MessageDigest.isEqual(supplied, expected)) return AckResult(false, null)
             val sentNanos = sendTimes.remove(ackSequence)
             val rtt = sentNanos?.let { ((SystemClock.elapsedRealtimeNanos() - it) / 1_000_000L).coerceAtLeast(0L) }
