@@ -54,8 +54,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun ControllerScreen() {
     val pressed = remember { mutableStateListOf<String>() }
-    val client = remember { UdpGamepadClient() }
+    val client = remember { GamepadTransportClient() }
     val scope = rememberCoroutineScope()
+    var transport by remember { mutableStateOf(TransportMode.WIFI) }
     var host by remember { mutableStateOf("") }
     var pairingKey by remember { mutableStateOf("") }
     var connected by remember { mutableStateOf(false) }
@@ -98,10 +99,13 @@ private fun ControllerScreen() {
                     hostSeen = true
                     latencyMs = ack.roundTripMs
                     status = "Connected · authenticated"
-                } else if (hostSeen) {
-                    hostSeen = false
-                    latencyMs = null
-                    status = "Host not responding"
+                } else {
+                    if (hostSeen) {
+                        hostSeen = false
+                        latencyMs = null
+                        status = "Host not responding"
+                    }
+                    delay(100)
                 }
             }
         }
@@ -124,12 +128,30 @@ private fun ControllerScreen() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Windows connection", fontSize = 15.sp, color = Ink)
-            OutlinedTextField(
-                value = host, onValueChange = { host = it },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Windows PC IP address") },
-                placeholder = { Text("192.168.1.10") }
-            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { if (!connected) transport = TransportMode.WIFI },
+                    enabled = !connected,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (transport == TransportMode.WIFI) Ink else Color.White, contentColor = if (transport == TransportMode.WIFI) Color.White else Ink),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Wi-Fi") }
+                Button(
+                    onClick = { if (!connected) transport = TransportMode.USB },
+                    enabled = !connected,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (transport == TransportMode.USB) Ink else Color.White, contentColor = if (transport == TransportMode.USB) Color.White else Ink),
+                    modifier = Modifier.weight(1f)
+                ) { Text("USB") }
+            }
+            if (transport == TransportMode.WIFI) {
+                OutlinedTextField(
+                    value = host, onValueChange = { host = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text("Windows PC IP address") },
+                    placeholder = { Text("192.168.1.10") }
+                )
+            } else {
+                Text("Enable USB debugging, connect the cable, then run adb reverse tcp:26761 tcp:26761 on Windows.", fontSize = 11.sp, color = Muted)
+            }
             OutlinedTextField(
                 value = pairingKey, onValueChange = { pairingKey = it },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -145,7 +167,7 @@ private fun ControllerScreen() {
                     } else {
                         scope.launch {
                             try {
-                                withContext(Dispatchers.IO) { client.connect(host, pairingKey) }
+                                withContext(Dispatchers.IO) { client.connect(host, pairingKey, transport) }
                                 hostSeen = false
                                 connected = true
                                 status = "Waiting for authenticated host response"
@@ -160,7 +182,7 @@ private fun ControllerScreen() {
             ) { Text(if (connected) "Disconnect" else "Connect") }
             Text(status, fontSize = 11.sp, color = if (hostSeen) Ink else Muted)
             Text("Network RTT: ${latencyMs?.let { "$it ms" } ?: "—"}", fontSize = 11.sp, color = Muted)
-            Text("Both devices must be on the same trusted private network. UDP port 26760.", fontSize = 10.sp, color = Muted)
+            Text(if (transport == TransportMode.WIFI) "Trusted private LAN only · UDP port 26760" else "USB uses ADB reverse · TCP port 26761", fontSize = 10.sp, color = Muted)
         }
 
         Text("Controller", fontSize = 17.sp, color = Ink)
