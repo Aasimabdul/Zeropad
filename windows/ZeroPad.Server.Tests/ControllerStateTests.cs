@@ -1,4 +1,6 @@
 using ZeroPad.Server;
+using System.Text.Json.Nodes;
+using System.Text;
 using Xunit;
 
 namespace ZeroPad.Server.Tests;
@@ -61,9 +63,11 @@ public sealed class ControllerStateTests
         var key = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
         var now = DateTimeOffset.UtcNow;
         var session = Guid.NewGuid();
-        var packet = BuildPacket(key, session, now.ToUnixTimeMilliseconds(), Valid);
-        packet[packet.Length - 4] ^= 0x40;
-        Assert.ThrowsAny<Exception>(() => AuthenticatedPacket.Parse(packet, key, now));
+        var node = JsonNode.Parse(BuildPacket(key, session, now.ToUnixTimeMilliseconds(), Valid))!;
+        var originalMac = node["mac"]!.GetValue<string>();
+        node["mac"] = (originalMac[0] == 'A' ? "B" : "A") + originalMac[1..];
+        var packet = Encoding.UTF8.GetBytes(node.ToJsonString());
+        Assert.Throws<FormatException>(() => AuthenticatedPacket.Parse(packet, key, now));
     }
 
     [Fact]
