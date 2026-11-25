@@ -8,9 +8,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -21,6 +26,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.snapshotFlow
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val Paper = Color(0xFFF7F7F5)
@@ -42,26 +54,113 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun ControllerScreen() {
     val pressed = remember { mutableStateListOf<String>() }
+    val client = remember { UdpGamepadClient() }
+    val scope = rememberCoroutineScope()
+    var host by remember { mutableStateOf("") }
+    var pairingKey by remember { mutableStateOf("") }
+    var connected by remember { mutableStateOf(false) }
+    var hostSeen by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("Not connected") }
     var leftX by remember { mutableFloatStateOf(0f) }
     var leftY by remember { mutableFloatStateOf(0f) }
     var rightX by remember { mutableFloatStateOf(0f) }
     var rightY by remember { mutableFloatStateOf(0f) }
 
+    DisposableEffect(client) {
+        onDispose { client.close() }
+    }
+
+    LaunchedEffect(connected) {
+        if (!connected) return@LaunchedEffect
+        launch {
+            snapshotFlow {
+                GamepadSnapshot(
+                    buttons = pressed.filter { it != "LT" && it != "RT" }.toSet(),
+                    leftX = leftX,
+                    leftY = leftY,
+                    rightX = rightX,
+                    rightY = rightY,
+                    leftTrigger = if ("LT" in pressed) 1f else 0f,
+                    rightTrigger = if ("RT" in pressed) 1f else 0f
+                )
+            }.collectLatest { snapshot ->
+                while (isActive) {
+                    withContext(Dispatchers.IO) { client.send(snapshot) }
+                    delay(50)
+                }
+            }
+        }
+        launch {
+            while (isActive) {
+                val acknowledged = withContext(Dispatchers.IO) { client.receiveAck() }
+                if (acknowledged) {
+                    hostSeen = true
+                    status = "Connected · authenticated"
+                } else if (hostSeen) {
+                    hostSeen = false
+                    status = "Host not responding"
+                }
+            }
+        }
+    }
+
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("ZeroPad", fontSize = 28.sp, color = Ink)
-                Text("VIRTUAL GAMEPAD", fontSize = 11.sp, color = Muted, letterSpacing = 1.5.sp)
+                Text("ANDROID GAMEPAD", fontSize = 11.sp, color = Muted, letterSpacing = 1.5.sp)
             }
-            Text("OFFLINE", fontSize = 10.sp, color = Muted)
+            Text(if (hostSeen) "CONNECTED" else if (connected) "WAITING" else "OFFLINE", fontSize = 10.sp, color = Muted)
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
-        Text("Controller preview", fontSize = 17.sp, color = Ink)
-        Text("Press and hold buttons · drag the sticks", fontSize = 12.sp, color = Muted)
 
+        Column(
+            Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(12.dp)).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Windows connection", fontSize = 15.sp, color = Ink)
+            OutlinedTextField(
+                value = host, onValueChange = { host = it },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Windows PC IP address") },
+                placeholder = { Text("192.168.1.10") }
+            )
+            OutlinedTextField(
+                value = pairingKey, onValueChange = { pairingKey = it },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Pairing key from Windows companion") }
+            )
+            Button(
+                onClick = {
+                    if (connected) {
+                        connected = false
+                        hostSeen = false
+                        status = "Not connected"
+                        client.close()
+                    } else {
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { client.connect(host, pairingKey) }
+                                hostSeen = false
+                                connected = true
+                                status = "Waiting for authenticated host response"
+                            } catch (error: Exception) {
+                                status = error.message ?: "Could not connect"
+                            }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (connected) "Disconnect" else "Connect") }
+            Text(status, fontSize = 11.sp, color = if (hostSeen) Ink else Muted)
+            Text("Both devices must be on the same trusted private network. UDP port 26760.", fontSize = 10.sp, color = Muted)
+        }
+
+        Text("Controller", fontSize = 17.sp, color = Ink)
+        Text("Hold buttons · drag sticks · triggers are pressure-style on/off in this preview", fontSize = 11.sp, color = Muted)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             StickPad("LEFT STICK", leftX, leftY, onAxis = { x, y -> leftX = x; leftY = y })
             StickPad("RIGHT STICK", rightX, rightY, onAxis = { x, y -> rightX = x; rightY = y })
@@ -80,7 +179,7 @@ private fun ControllerScreen() {
                 PadButton("Y", pressed.contains("Y")) { update(pressed, "Y", it) }
                 Row {
                     PadButton("X", pressed.contains("X")) { update(pressed, "X", it) }
-                    Spacer(Modifier.width(40.dp))
+                    Spacer(Modifier.width(36.dp))
                     PadButton("B", pressed.contains("B")) { update(pressed, "B", it) }
                 }
                 PadButton("A", pressed.contains("A")) { update(pressed, "A", it) }
@@ -94,10 +193,10 @@ private fun ControllerScreen() {
         }
 
         Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
-        Text("Input diagnostics", fontSize = 14.sp, color = Ink)
+        Text("Diagnostics", fontSize = 14.sp, color = Ink)
         Text("Buttons: ${pressed.joinToString().ifEmpty { "none" }}", fontSize = 11.sp, color = Muted)
         Text("L: ${axisText(leftX)}, ${axisText(leftY)}    R: ${axisText(rightX)}, ${axisText(rightY)}", fontSize = 11.sp, color = Muted)
-        Text("Preview only — network transport and virtual Xbox output are not implemented.", fontSize = 11.sp, color = Muted)
+        Text("Network sends at 20 Hz with authenticated snapshots. Latency measurements and USB are not implemented yet.", fontSize = 11.sp, color = Muted)
     }
 }
 
@@ -152,11 +251,7 @@ private fun PadButton(label: String, active: Boolean, onInput: (Boolean) -> Unit
             .pointerInput(label) {
                 detectTapGestures(onPress = {
                     onInput(true)
-                    try {
-                        tryAwaitRelease()
-                    } finally {
-                        onInput(false)
-                    }
+                    try { tryAwaitRelease() } finally { onInput(false) }
                 })
             },
         contentAlignment = Alignment.Center
