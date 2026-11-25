@@ -24,3 +24,12 @@ jobs:
         run: dotnet build windows/ZeroPad.sln --configuration Release
       - name: Run protocol tests
         run: dotnet test windows/ZeroPad.sln --configuration Release --no-build
+      - name: Publish portable Windows x64 companion
+        run: dotnet publish windows/ZeroPad.Server/ZeroPad.Server.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts/ZeroPad-Windows-x64
+      - name: Upload Windows companion
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeropad-windows-x64
+          path: artifacts/ZeroPad-Windows-x64/**
+          if-no-files-found: error
+          retention-days: 14
