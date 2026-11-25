@@ -51,6 +51,6 @@ HMAC-SHA256 covers UTF-8 bytes of `session + newline + sentAt + newline + payloa
 
 ## Acknowledgement
 
-The host responds with `type=ack`, the same session ID and state sequence, `virtualOutput` (whether a virtual controller backend is currently available), and a Base64 HMAC-SHA256 of `ack + newline + session + newline + sequence`. Android uses the authenticated acknowledgement to display host response status and network round-trip time.
+The host responds with `type=ack`, the same session ID and state sequence, `virtualOutput` (whether a virtual controller backend is currently available), and a Base64 HMAC-SHA256 of `ack + newline + session + newline + sequence + newline + virtualOutput`, where the boolean is lowercase `true` or `false`. Android uses the authenticated acknowledgement to display host response status and network round-trip time.
 
 Breaking changes require a version increment and compatibility notes.
