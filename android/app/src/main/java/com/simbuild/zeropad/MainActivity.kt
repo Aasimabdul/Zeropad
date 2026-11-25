@@ -182,7 +182,7 @@ private fun ControllerScreen() {
             if (transport == TransportMode.WIFI) {
                 OutlinedTextField(
                     value = host, onValueChange = { host = it },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !connected,
                     label = { Text("Windows PC IP address") },
                     placeholder = { Text("192.168.1.10") }
                 )
@@ -191,7 +191,7 @@ private fun ControllerScreen() {
             }
             OutlinedTextField(
                 value = pairingKey, onValueChange = { pairingKey = it },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !connected,
                 label = { Text("Pairing key from Windows companion") }
             )
             Button(
