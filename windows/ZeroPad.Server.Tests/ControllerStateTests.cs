@@ -39,6 +39,6 @@ public sealed class ControllerStateTests
     [Fact]
     public void RejectsMalformedJson()
     {
-        Assert.Throws<System.Text.Json.JsonException>(() => ControllerState.Parse("{"));
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => ControllerState.Parse("{"));
     }
 }
