@@ -1,6 +1,8 @@
 package com.simbuild.zeropad
 
 import android.util.Base64
+import android.os.SystemClock
+import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.DatagramPacket
@@ -20,6 +22,8 @@ internal data class GamepadSnapshot(
     val rightTrigger: Float
 )
 
+internal data class AckResult(val received: Boolean, val roundTripMs: Long?)
+
 internal class UdpGamepadClient {
     companion object {
         const val PORT = 26760
@@ -31,6 +35,7 @@ internal class UdpGamepadClient {
     private var key: ByteArray? = null
     private var session = UUID.randomUUID().toString()
     private var sequence = 0L
+    private val sendTimes = ConcurrentHashMap<Long, Long>()
 
     @Synchronized
     fun connect(host: String, pairingKey: String) {
@@ -53,10 +58,14 @@ internal class UdpGamepadClient {
     fun send(snapshot: GamepadSnapshot) {
         val udp = socket ?: return
         val secret = key ?: return
+        val currentSequence = sequence++
+        val nowNanos = SystemClock.elapsedRealtimeNanos()
+        sendTimes.entries.removeIf { nowNanos - it.value > 5_000_000_000L }
+        sendTimes[currentSequence] = nowNanos
         val payload = JSONObject()
             .put("version", 1)
             .put("type", "state")
-            .put("sequence", sequence++)
+            .put("sequence", currentSequence)
             .put("buttons", JSONArray(snapshot.buttons.sorted()))
             .put("axes", JSONObject()
                 .put("leftX", snapshot.leftX.toDouble())
@@ -84,23 +93,26 @@ internal class UdpGamepadClient {
         udp.send(DatagramPacket(envelope, envelope.size, address, PORT))
     }
 
-    fun receiveAck(): Boolean {
-        val udp = socket ?: return false
-        val secret = key ?: return false
+    fun receiveAck(): AckResult {
+        val udp = socket ?: return AckResult(false, null)
+        val secret = key ?: return AckResult(false, null)
         return try {
             val bytes = ByteArray(MAX_DATAGRAM_BYTES)
             val packet = DatagramPacket(bytes, bytes.size)
             udp.receive(packet)
             val ack = JSONObject(String(packet.data, packet.offset, packet.length, Charsets.UTF_8))
-            if (ack.optString("type") != "ack" || ack.optString("session") != session) return false
+            if (ack.optString("type") != "ack" || ack.optString("session") != session) return AckResult(false, null)
             val ackSequence = ack.optLong("sequence", -1L)
             val supplied = Base64.decode(ack.optString("mac"), Base64.DEFAULT)
             val expected = hmac(secret, "ack\n$session\n$ackSequence".toByteArray(Charsets.UTF_8))
-            supplied.contentEquals(expected)
+            if (!supplied.contentEquals(expected)) return AckResult(false, null)
+            val sentNanos = sendTimes.remove(ackSequence)
+            val rtt = sentNanos?.let { ((SystemClock.elapsedRealtimeNanos() - it) / 1_000_000L).coerceAtLeast(0L) }
+            AckResult(true, rtt)
         } catch (_: java.net.SocketTimeoutException) {
-            false
+            AckResult(false, null)
         } catch (_: Exception) {
-            false
+            AckResult(false, null)
         }
     }
 
