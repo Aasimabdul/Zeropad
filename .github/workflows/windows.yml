@@ -17,5 +17,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Build companion
+      - name: Build solution
         run: dotnet build windows/ZeroPad.sln --configuration Release
+      - name: Run protocol tests
+        run: dotnet test windows/ZeroPad.sln --configuration Release --no-build
