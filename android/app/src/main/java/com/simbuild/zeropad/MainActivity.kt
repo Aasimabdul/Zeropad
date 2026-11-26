@@ -60,8 +60,13 @@ class MainActivity : ComponentActivity() {
             val ink = if (darkMode) DarkInk else Ink
             val muted = if (darkMode) DarkMuted else Muted
             val border = if (darkMode) DarkBorder else Border
+            val backdrop = Brush.linearGradient(if (darkMode) listOf(Color(0xFF080D18), Color(0xFF18243B), Color(0xFF10151F)) else listOf(Color(0xFFF4F7FC), Color(0xFFDDE8F8), Color(0xFFF6F8FC)))
             MaterialTheme(colorScheme = if (darkMode) darkColorScheme(primary = Color(0xFF4C8DFF), background = bg, surface = surface, onSurface = ink) else lightColorScheme(primary = Color(0xFF245FC7), background = bg, surface = surface, onSurface = ink)) {
-                Surface(Modifier.fillMaxSize(), color = bg) { Box(Modifier.fillMaxSize().background(Brush.linearGradient(if (darkMode) listOf(Color(0xFF080D18), Color(0xFF18243B), Color(0xFF10151F)) else listOf(Color(0xFFF4F7FC), Color(0xFFDDE8F8), Color(0xFFF6F8FC)))) { ControllerScreen(darkMode, { darkMode = it }, bg, surface.copy(alpha = if (darkMode) 0.76f else 0.82f), ink, muted, border.copy(alpha = 0.75f)) } }
+                Surface(Modifier.fillMaxSize(), color = bg) {
+                    Box(Modifier.fillMaxSize().background(backdrop)) {
+                        ControllerScreen(darkMode, { darkMode = it }, bg, surface.copy(alpha = if (darkMode) 0.76f else 0.82f), ink, muted, border.copy(alpha = 0.75f))
+                    }
+                }
             }
         }
     }
