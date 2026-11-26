@@ -159,21 +159,21 @@ internal sealed class CompanionForm : Form
     private void SetKey(string value)
     {
         if (IsDisposed) return;
-        if (InvokeRequired) { BeginInvoke(() => SetKey(value)); return; }
+        if (InvokeRequired) { BeginInvoke(new Action(() => SetKey(value))); return; }
         pairingKey.Text = value;
     }
 
     private void SetStatus(string value, Color color)
     {
         if (IsDisposed) return;
-        if (InvokeRequired) { BeginInvoke(() => SetStatus(value, color)); return; }
+        if (InvokeRequired) { BeginInvoke(new Action(() => SetStatus(value, color))); return; }
         status.Text = value; status.ForeColor = color;
     }
 
     private void AppendLog(string line)
     {
         if (IsDisposed) return;
-        if (InvokeRequired) { BeginInvoke(() => AppendLog(line)); return; }
+        if (InvokeRequired) { BeginInvoke(new Action(() => AppendLog(line))); return; }
         log.AppendText($"[{DateTime.Now:HH:mm:ss}] {line}{Environment.NewLine}");
         log.SelectionStart = log.TextLength; log.ScrollToCaret();
     }
