@@ -184,8 +184,8 @@ private fun ControllerScreen(darkMode: Boolean, setDarkMode: (Boolean) -> Unit, 
             }
             Text("QUICK SETUP  ·  3 STEPS", fontSize = 10.sp, color = muted, letterSpacing = 1.2.sp)
             Text("01  Run ZeroPad Companion on Windows", color = ink, modifier = Modifier.fillMaxWidth().background(surface.copy(alpha = 0.68f), RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(11.dp))
-            Text("02  Use the same private Wi-Fi, or connect USB/ADB", color = ink, modifier = Modifier.fillMaxWidth().background(surface, RoundedCornerShape(12.dp)).padding(14.dp))
-            Text("03  Copy the PC IP and pairing key into this screen", color = ink, modifier = Modifier.fillMaxWidth().background(surface, RoundedCornerShape(12.dp)).padding(14.dp))
+            Text("02  Use the same private Wi-Fi, or connect USB/ADB", color = ink, modifier = Modifier.fillMaxWidth().background(surface.copy(alpha = 0.68f), RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(11.dp))
+            Text("03  Copy the PC IP and pairing key into this screen", color = ink, modifier = Modifier.fillMaxWidth().background(surface.copy(alpha = 0.68f), RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(11.dp))
         }
     } else {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -206,17 +206,19 @@ private fun ControllerScreen(darkMode: Boolean, setDarkMode: (Boolean) -> Unit, 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { PadButton("⌃", pressed.contains("UP"), ink, surface, border) { update(pressed, "UP", it) }; Row { PadButton("‹", pressed.contains("LEFT"), ink, surface, border) { update(pressed, "LEFT", it) }; PadButton("⌄", pressed.contains("DOWN"), ink, surface, border) { update(pressed, "DOWN", it) }; PadButton("›", pressed.contains("RIGHT"), ink, surface, border) { update(pressed, "RIGHT", it) } } }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { PadButton("Y", pressed.contains("Y"), ink, surface, border) { update(pressed, "Y", it) }; Row { PadButton("X", pressed.contains("X"), ink, surface, border) { update(pressed, "X", it) }; Spacer(Modifier.width(12.dp)); PadButton("B", pressed.contains("B"), ink, surface, border) { update(pressed, "B", it) } }; PadButton("A", pressed.contains("A"), ink, surface, border) { update(pressed, "A", it) } }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { listOf("L1", "L2", "VIEW", "MENU", "R2", "R1").forEach { key -> PadButton(key, pressed.contains(key), ink, surface, border, compact = true) { update(pressed, key, it) } } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { listOf("LB", "LT", "SELECT", "START", "RT", "RB").forEach { key -> PadButton(key, pressed.contains(key), ink, surface, border, compact = true) { update(pressed, key, it) } } }
             Column(Modifier.fillMaxWidth().background(surface, RoundedCornerShape(14.dp)).border(1.dp, border, RoundedCornerShape(14.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("⌁  Diagnostics", color = ink, fontSize = 12.sp)
-                Text("Buttons: " + pressed.joinToString().ifEmpty { "none" }, color = muted, fontSize = 12.sp)
-                Text("L: " + axisText(leftX) + ", " + axisText(leftY) + "    R: " + axisText(rightX) + ", " + axisText(rightY), color = muted, fontSize = 12.sp)
-                Text(status, color = muted, fontSize = 12.sp)
+                Text("Buttons: " + pressed.joinToString().ifEmpty { "none" }, color = muted, fontSize = 10.sp)
+                Text("L: " + axisText(leftX) + ", " + axisText(leftY) + "    R: " + axisText(rightX) + ", " + axisText(rightY), color = muted, fontSize = 10.sp)
+                Text(status, color = muted, fontSize = 10.sp)
                 Text("20 Hz · RTT is not full game-input latency.", color = muted, fontSize = 9.sp)
             }
         }
     }
 }
+
+private fun surfaceTint(color: Color): Color = color.copy(alpha = 0.60f)
 
 private fun axisText(value: Float): String = (value * 100).roundToInt().toString()
 
@@ -231,8 +233,8 @@ private fun StickPad(label: String, axisX: Float, axisY: Float, modifier: Modifi
         Text(label, fontSize = 10.sp, color = muted, letterSpacing = 1.sp)
         Spacer(Modifier.height(8.dp))
         Box(
-            Modifier.fillMaxWidth().aspectRatio(1f)
-                .background(bg, CircleShape)
+            Modifier.widthIn(max = 126.dp).fillMaxWidth().aspectRatio(1f)
+                .background(surfaceTint(bg), CircleShape)
                 .border(1.dp, border, CircleShape)
                 .pointerInput(label) {
                     fun setAxis(position: Offset) {
