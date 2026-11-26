@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,12 +40,12 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
-private val Paper = Color(0xFFF7F7F5)
+private val Paper = Color(0xFFEAF0F8)
 private val Ink = Color(0xFF111111)
 private val Muted = Color(0xFF777777)
 private val Border = Color(0xFFD9D9D5)
-private val DarkBg = Color(0xFF0B0D10)
-private val DarkSurface = Color(0xFF15181D)
+private val DarkBg = Color(0xFF080D18)
+private val DarkSurface = Color(0xAA1A2434)
 private val DarkInk = Color(0xFFF4F6F8)
 private val DarkMuted = Color(0xFFA1A8B2)
 private val DarkBorder = Color(0xFF303640)
@@ -60,7 +61,7 @@ class MainActivity : ComponentActivity() {
             val muted = if (darkMode) DarkMuted else Muted
             val border = if (darkMode) DarkBorder else Border
             MaterialTheme(colorScheme = if (darkMode) darkColorScheme(primary = Color(0xFF4C8DFF), background = bg, surface = surface, onSurface = ink) else lightColorScheme(primary = Color(0xFF245FC7), background = bg, surface = surface, onSurface = ink)) {
-                Surface(Modifier.fillMaxSize(), color = bg) { ControllerScreen(darkMode, { darkMode = it }, bg, surface, ink, muted, border) }
+                Surface(Modifier.fillMaxSize(), color = bg) { Box(Modifier.fillMaxSize().background(Brush.linearGradient(if (darkMode) listOf(Color(0xFF080D18), Color(0xFF18243B), Color(0xFF10151F)) else listOf(Color(0xFFF4F7FC), Color(0xFFDDE8F8), Color(0xFFF6F8FC)))) { ControllerScreen(darkMode, { darkMode = it }, bg, surface.copy(alpha = if (darkMode) 0.76f else 0.82f), ink, muted, border.copy(alpha = 0.75f)) } }
             }
         }
     }
@@ -163,55 +164,55 @@ private fun ControllerScreen(darkMode: Boolean, setDarkMode: (Boolean) -> Unit, 
     }
 
     if (!connected) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("ZEROPAD", fontSize = 26.sp, color = ink); Text("PHONE AS YOUR GAMEPAD", fontSize = 11.sp, color = muted, letterSpacing = 1.4.sp) }
+                Column(Modifier.weight(1f)) { Text("◈  ZEROPAD", fontSize = 23.sp, color = ink); Text("PHONE AS YOUR GAMEPAD", fontSize = 10.sp, color = muted, letterSpacing = 1.2.sp) }
                 Button(onClick = { setDarkMode(!darkMode) }, shape = RoundedCornerShape(12.dp)) { Text(if (darkMode) "☀ Light" else "☾ Dark") }
             }
-            Column(Modifier.fillMaxWidth().background(surface, RoundedCornerShape(20.dp)).border(1.dp, border, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Connect to PC", fontSize = 20.sp, color = ink)
-                Text("Enter the details from the Windows companion.", fontSize = 12.sp, color = muted)
+            Column(Modifier.fillMaxWidth().background(surface, RoundedCornerShape(22.dp)).border(1.dp, border, RoundedCornerShape(22.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Connect to PC  ↗", fontSize = 18.sp, color = ink)
+                Text("Pair securely with your Windows companion.", fontSize = 11.sp, color = muted)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { if (!connected) transport = TransportMode.WIFI }, enabled = !connected, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (transport == TransportMode.WIFI) ink else surface, contentColor = if (transport == TransportMode.WIFI) surface else ink)) { Text("Wi-Fi") }
+                    Button(onClick = { if (!connected) transport = TransportMode.WIFI }, enabled = !connected, modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = if (transport == TransportMode.WIFI) ink else surface, contentColor = if (transport == TransportMode.WIFI) surface else ink)) { Text("Wi-Fi") }
                     Button(onClick = { if (!connected) transport = TransportMode.USB }, enabled = !connected, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (transport == TransportMode.USB) ink else surface, contentColor = if (transport == TransportMode.USB) surface else ink)) { Text("USB / ADB") }
                 }
                 if (transport == TransportMode.WIFI) OutlinedTextField(host, { host = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Windows PC IP address") }, placeholder = { Text("192.168.1.10") })
                 else Text("Enable USB debugging and run: adb reverse tcp:26761 tcp:26761", fontSize = 11.sp, color = muted)
                 OutlinedTextField(pairingKey, { pairingKey = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Pairing key (Base64)") })
-                Button(onClick = { connected = true; status = "Connecting to Windows…" }, enabled = pairingKey.isNotBlank() && (transport == TransportMode.USB || host.isNotBlank()), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text("Open controller  →") }
+                Button(onClick = { connected = true; status = "Connecting to Windows…" }, enabled = pairingKey.isNotBlank() && (transport == TransportMode.USB || host.isNotBlank()), modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(14.dp)) { Text("Open controller  →") }
                 Text(status, fontSize = 12.sp, color = muted)
             }
-            Text("QUICK SETUP", fontSize = 11.sp, color = muted, letterSpacing = 1.4.sp)
-            Text("01  Run ZeroPad Companion on Windows", color = ink, modifier = Modifier.fillMaxWidth().background(surface, RoundedCornerShape(12.dp)).padding(14.dp))
+            Text("QUICK SETUP  ·  3 STEPS", fontSize = 10.sp, color = muted, letterSpacing = 1.2.sp)
+            Text("01  Run ZeroPad Companion on Windows", color = ink, modifier = Modifier.fillMaxWidth().background(surface.copy(alpha = 0.68f), RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(11.dp))
             Text("02  Use the same private Wi-Fi, or connect USB/ADB", color = ink, modifier = Modifier.fillMaxWidth().background(surface, RoundedCornerShape(12.dp)).padding(14.dp))
             Text("03  Copy the PC IP and pairing key into this screen", color = ink, modifier = Modifier.fillMaxWidth().background(surface, RoundedCornerShape(12.dp)).padding(14.dp))
         }
     } else {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("ZEROPAD", fontSize = 23.sp, color = ink); Text(if (hostSeen) "● PC CONNECTED" else "● WAITING FOR PC", fontSize = 10.sp, color = muted) }
+                Column(Modifier.weight(1f)) { Text("◈  ZEROPAD", fontSize = 20.sp, color = ink); Text(if (hostSeen) "● CONNECTED" else "● WAITING FOR PC", fontSize = 9.sp, color = muted) }
                 Button(onClick = { setDarkMode(!darkMode) }) { Text(if (darkMode) "☀" else "☾") }
                 OutlinedButton(onClick = { connected = false; transportReady = false; hostSeen = false; latencyMs = null; status = "Disconnected"; client.close(); pressed.clear(); leftX = 0f; leftY = 0f; rightX = 0f; rightY = 0f }) { Text("Exit") }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f).background(surface, RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("LINK", fontSize = 10.sp, color = muted); Text(if (hostSeen) "Connected" else "Waiting", color = ink) }
-                Column(Modifier.weight(1f).background(surface, RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("ROUND TRIP", fontSize = 10.sp, color = muted); Text(latencyMs?.toString()?.plus(" ms") ?: "—", color = ink) }
+                Column(Modifier.weight(1f).background(surface, RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(8.dp)) { Text("LINK", fontSize = 9.sp, color = muted); Text(if (hostSeen) "✓ Connected" else "◌ Waiting", color = ink, fontSize = 12.sp) }
+                Column(Modifier.weight(1f).background(surface, RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(8.dp)) { Text("ROUND TRIP", fontSize = 9.sp, color = muted); Text(latencyMs?.toString()?.plus(" ms") ?: "—", color = ink, fontSize = 12.sp) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StickPad("LEFT STICK", leftX, leftY, Modifier.weight(1f), bg, ink, muted, border) { x, y -> leftX = x; leftY = y }
                 StickPad("RIGHT STICK", rightX, rightY, Modifier.weight(1f), bg, ink, muted, border) { x, y -> rightX = x; rightY = y }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) { PadButton("↑", pressed.contains("UP"), ink, surface, border) { update(pressed, "UP", it) }; Row { PadButton("←", pressed.contains("LEFT"), ink, surface, border) { update(pressed, "LEFT", it) }; PadButton("↓", pressed.contains("DOWN"), ink, surface, border) { update(pressed, "DOWN", it) }; PadButton("→", pressed.contains("RIGHT"), ink, surface, border) { update(pressed, "RIGHT", it) } } }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { PadButton("⌃", pressed.contains("UP"), ink, surface, border) { update(pressed, "UP", it) }; Row { PadButton("‹", pressed.contains("LEFT"), ink, surface, border) { update(pressed, "LEFT", it) }; PadButton("⌄", pressed.contains("DOWN"), ink, surface, border) { update(pressed, "DOWN", it) }; PadButton("›", pressed.contains("RIGHT"), ink, surface, border) { update(pressed, "RIGHT", it) } } }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { PadButton("Y", pressed.contains("Y"), ink, surface, border) { update(pressed, "Y", it) }; Row { PadButton("X", pressed.contains("X"), ink, surface, border) { update(pressed, "X", it) }; Spacer(Modifier.width(12.dp)); PadButton("B", pressed.contains("B"), ink, surface, border) { update(pressed, "B", it) } }; PadButton("A", pressed.contains("A"), ink, surface, border) { update(pressed, "A", it) } }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { listOf("LB", "LT", "SELECT", "START", "RT", "RB").forEach { key -> PadButton(key, pressed.contains(key), ink, surface, border, compact = true) { update(pressed, key, it) } } }
-            Column(Modifier.fillMaxWidth().background(surface, RoundedCornerShape(14.dp)).border(1.dp, border, RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Input diagnostics", color = ink, fontSize = 14.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { listOf("L1", "L2", "VIEW", "MENU", "R2", "R1").forEach { key -> PadButton(key, pressed.contains(key), ink, surface, border, compact = true) { update(pressed, key, it) } } }
+            Column(Modifier.fillMaxWidth().background(surface, RoundedCornerShape(14.dp)).border(1.dp, border, RoundedCornerShape(14.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("⌁  Diagnostics", color = ink, fontSize = 12.sp)
                 Text("Buttons: " + pressed.joinToString().ifEmpty { "none" }, color = muted, fontSize = 12.sp)
                 Text("L: " + axisText(leftX) + ", " + axisText(leftY) + "    R: " + axisText(rightX) + ", " + axisText(rightY), color = muted, fontSize = 12.sp)
                 Text(status, color = muted, fontSize = 12.sp)
-                Text("20 Hz snapshots · RTT is phone-to-host-and-back, not full game latency.", color = muted, fontSize = 10.sp)
+                Text("20 Hz · RTT is not full game-input latency.", color = muted, fontSize = 9.sp)
             }
         }
     }
@@ -253,7 +254,7 @@ private fun StickPad(label: String, axisX: Float, axisY: Float, modifier: Modifi
                 },
             contentAlignment = Alignment.Center
         ) {
-            Box(Modifier.size(42.dp).offset(x = (axisX * 32f).dp, y = (-axisY * 32f).dp).background(ink, CircleShape))
+            Box(Modifier.size(34.dp).offset(x = (axisX * 28f).dp, y = (-axisY * 28f).dp).background(ink, CircleShape))
         }
     }
 }
@@ -261,7 +262,7 @@ private fun StickPad(label: String, axisX: Float, axisY: Float, modifier: Modifi
 @Composable
 private fun PadButton(label: String, active: Boolean, ink: Color, surface: Color, border: Color, compact: Boolean = false, onInput: (Boolean) -> Unit) {
     Box(
-        Modifier.padding(2.dp).size(if (compact) 44.dp else 48.dp)
+        Modifier.padding(1.dp).size(if (compact) 36.dp else 42.dp)
             .background(if (active) ink else surface, RoundedCornerShape(12.dp))
             .border(1.dp, if (active) ink else border, RoundedCornerShape(12.dp))
             .pointerInput(label) {
@@ -272,6 +273,6 @@ private fun PadButton(label: String, active: Boolean, ink: Color, surface: Color
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(label, modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp), fontSize = if (compact) 9.sp else 12.sp, color = if (active) surface else ink)
+        Text(label, modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp), fontSize = if (compact) 8.sp else 12.sp, color = if (active) surface else ink)
     }
 }
