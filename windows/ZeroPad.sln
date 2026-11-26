@@ -6,7 +6,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Server", "ZeroPad.S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Server.Tests", "ZeroPad.Server.Tests\\ZeroPad.Server.Tests.csproj", "{BC4D70B4-8F2D-4B14-BD1A-2AB76A8FECF0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Desktop", "ZeroPad.Desktop\\ZeroPad.Desktop.csproj", "{5C3D7F51-7B41-47E6-91E9-21DCEB2B9F51}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Desktop", "ZeroPad.Desktop\ZeroPad.Desktop.csproj", "{5C3D7F51-7B41-47E6-91E9-21DCEB2B9F51}"
 EndProject
 Global
  GlobalSection(SolutionConfigurationPlatforms) = preSolution
