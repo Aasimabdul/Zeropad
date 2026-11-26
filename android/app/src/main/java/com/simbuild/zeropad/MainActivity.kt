@@ -190,7 +190,7 @@ private fun ControllerScreen(darkMode: Boolean, setDarkMode: (Boolean) -> Unit, 
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text("ZEROPAD", fontSize = 23.sp, color = ink); Text(if (hostSeen) "● PC CONNECTED" else "● WAITING FOR PC", fontSize = 10.sp, color = muted) }
-                Button(onClick = { darkMode = !darkMode }) { Text(if (darkMode) "☀" else "☾") }
+                Button(onClick = { setDarkMode(!darkMode) }) { Text(if (darkMode) "☀" else "☾") }
                 OutlinedButton(onClick = { connected = false; transportReady = false; hostSeen = false; latencyMs = null; status = "Disconnected"; client.close(); pressed.clear(); leftX = 0f; leftY = 0f; rightX = 0f; rightY = 0f }) { Text("Exit") }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
