@@ -17,6 +17,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -165,7 +166,7 @@ private fun ControllerScreen(darkMode: Boolean, setDarkMode: (Boolean) -> Unit, 
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text("ZEROPAD", fontSize = 26.sp, color = ink); Text("PHONE AS YOUR GAMEPAD", fontSize = 11.sp, color = muted, letterSpacing = 1.4.sp) }
-                Button(onClick = { darkMode = !darkMode }, shape = RoundedCornerShape(12.dp)) { Text(if (darkMode) "☀ Light" else "☾ Dark") }
+                Button(onClick = { setDarkMode(!darkMode) }, shape = RoundedCornerShape(12.dp)) { Text(if (darkMode) "☀ Light" else "☾ Dark") }
             }
             Column(Modifier.fillMaxWidth().background(surface, RoundedCornerShape(20.dp)).border(1.dp, border, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Connect to PC", fontSize = 20.sp, color = ink)
@@ -197,8 +198,8 @@ private fun ControllerScreen(darkMode: Boolean, setDarkMode: (Boolean) -> Unit, 
                 Column(Modifier.weight(1f).background(surface, RoundedCornerShape(12.dp)).border(1.dp, border, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("ROUND TRIP", fontSize = 10.sp, color = muted); Text(latencyMs?.toString()?.plus(" ms") ?: "—", color = ink) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StickPad("LEFT STICK", leftX, leftY, Modifier.weight(1f), bg, ink, border) { x, y -> leftX = x; leftY = y }
-                StickPad("RIGHT STICK", rightX, rightY, Modifier.weight(1f), bg, ink, border) { x, y -> rightX = x; rightY = y }
+                StickPad("LEFT STICK", leftX, leftY, Modifier.weight(1f), bg, ink, muted, border) { x, y -> leftX = x; leftY = y }
+                StickPad("RIGHT STICK", rightX, rightY, Modifier.weight(1f), bg, ink, muted, border) { x, y -> rightX = x; rightY = y }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { PadButton("↑", pressed.contains("UP"), ink, surface, border) { update(pressed, "UP", it) }; Row { PadButton("←", pressed.contains("LEFT"), ink, surface, border) { update(pressed, "LEFT", it) }; PadButton("↓", pressed.contains("DOWN"), ink, surface, border) { update(pressed, "DOWN", it) }; PadButton("→", pressed.contains("RIGHT"), ink, surface, border) { update(pressed, "RIGHT", it) } } }
@@ -224,7 +225,7 @@ private fun update(pressed: MutableList<String>, key: String, down: Boolean) {
 }
 
 @Composable
-private fun StickPad(label: String, axisX: Float, axisY: Float, modifier: Modifier, bg: Color, ink: Color, border: Color, onAxis: (Float, Float) -> Unit) {
+private fun StickPad(label: String, axisX: Float, axisY: Float, modifier: Modifier, bg: Color, ink: Color, muted: Color, border: Color, onAxis: (Float, Float) -> Unit) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, fontSize = 10.sp, color = muted, letterSpacing = 1.sp)
         Spacer(Modifier.height(8.dp))
