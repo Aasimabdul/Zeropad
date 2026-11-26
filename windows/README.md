@@ -4,7 +4,7 @@ Target framework: .NET 8. The companion receives authenticated Wi-Fi UDP control
 
 ## Get a test build
 
-The Windows CI workflow builds and tests the solution, then publishes a self-contained Windows x64 companion as the `zeropad-windows-x64` workflow artifact. Open the latest successful [Windows CI run](https://github.com/Aasimabdul/Zeropad/actions/workflows/windows.yml), select the run for the `dev/zeropad-foundation` branch, and download the artifact. It is a short-lived developer test build, not a signed installer.
+The Windows CI workflow builds and tests the solution, then publishes a self-contained Windows x64 glass-style desktop companion and its server backend as the `zeropad-windows-x64` workflow artifact. Launch `ZeroPad.Desktop.exe`, press **Start companion**, copy the pairing key, and enter the displayed PC IP plus pairing key in Android. The `server` folder must remain beside the desktop executable. Open the latest successful [Windows CI run](https://github.com/Aasimabdul/Zeropad/actions/workflows/windows.yml), select the run for the `dev/zeropad-foundation` branch, and download the artifact. It is a short-lived developer test build, not a signed installer.
 
 ## Build and run from source
 
