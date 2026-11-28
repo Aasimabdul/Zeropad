@@ -2,7 +2,11 @@
 
 **ZeroPad** is an open-source Android-to-Windows gamepad project. The Android client uses Kotlin + Jetpack Compose; the Windows companion is C#/.NET 8. The intended output is an Xbox 360/XInput-compatible virtual controller.
 
-> **Status: early development prototype.** Android touch controls, authenticated Wi-Fi UDP snapshots, an ADB-reverse USB/TCP path, Windows state validation, an optional ViGEm adapter, RTT display, and protocol tests are present. End-to-end phone-to-PC behavior still needs real-device testing. QR pairing, analog-pressure triggers, tray UI/installer, and hardware certification are not complete.
+> **Status: first release (v0.1.0).** Android touch controller (landscape, two sticks, D-pad, ABXY, shoulders/triggers, Start/Select), authenticated Wi-Fi UDP and USB/ADB paths, Windows companion with a virtual Xbox 360 pad. The joystick maths, protocol and the whole phone-to-virtual-pad path are covered by automated tests (a recording pad stands in for the driver). It has **not** yet been tried on a real phone with a real game; please report what you see. QR pairing, tray UI/installer and hardware certification are not done.
+
+## Download
+
+Get the latest APK and the Windows zip from [Releases](../../releases). Quick start: install the [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases) driver, run `ZeroPad.exe`, enter the shown address and pairing key in the phone app, then check `joy.cpl`.
 
 ## Project layout
 

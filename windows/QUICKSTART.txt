@@ -1,0 +1,13 @@
+ZeroPad Companion - quick start
+
+1. Install the ViGEmBus driver once (needed for the virtual Xbox 360 controller):
+   https://github.com/nefarius/ViGEmBus/releases
+2. Run ZeroPad.exe. When Windows Firewall asks, allow "Private networks".
+3. The window shows your PC address and a pairing key.
+4. On the phone: open ZeroPad, type the address and key, tap "Open controller".
+   Phone and PC must be on the same Wi-Fi. Or use USB: plug in, enable USB debugging, run
+   adb reverse tcp:26761 tcp:26761   and choose "USB / ADB" in the app.
+5. Test: press Win+R, type joy.cpl, open the Xbox 360 controller, move the sticks.
+
+Keep ZeroPad on private networks only. Never forward port 26760 to the internet.
+The pairing key is stored in %LOCALAPPDATA%\ZeroPad\pairing.key (delete it to make a new one).
