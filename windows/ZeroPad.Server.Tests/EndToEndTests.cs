@@ -147,8 +147,15 @@ public sealed class EndToEndTests
         using var stream = tcp.GetStream();
         await stream.WriteAsync(new byte[6000].Select(_ => (byte)'x').ToArray());
         var buffer = new byte[16];
-        var read = await stream.ReadAsync(buffer).AsTask().WaitAsync(TimeSpan.FromSeconds(2));
-        Assert.Equal(0, read); // server closed us
+        var closed = false;
+        try
+        {
+            var read = await stream.ReadAsync(buffer).AsTask().WaitAsync(TimeSpan.FromSeconds(2));
+            closed = read == 0; // clean close (Linux)
+        }
+        catch (IOException) { closed = true; }     // connection reset (Windows)
+        catch (SocketException) { closed = true; }
+        Assert.True(closed, "server should have dropped the connection");
         Assert.Equal(0, sink.Count);
     }
 }
