@@ -15,7 +15,7 @@ Android touch controls -> normalized snapshot -> HMAC-authenticated UDP (Wi-Fi) 
 
 ## Reliability and security requirements
 
-- Send complete snapshots at 20 Hz; changes cause the sender to restart the keepalive loop so updates are sent promptly.
+- Send complete snapshots about 60 times per second while a control changes, and 10 times per second while idle (the PC releases the pad after 1 s of silence).
 - Include a random session ID, timestamp, sequence, protocol version, and HMAC.
 - Verify HMAC in constant time and reject stale timestamps, sequences, malformed data, and out-of-range controls.
 - Clear all held buttons and reset axes/triggers after one second without valid input.
