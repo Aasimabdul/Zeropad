@@ -15,6 +15,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../ZeroPad.Server/ZeroPad.Server.csproj" />
+    <ProjectReference Include="../ZeroPad.Core/ZeroPad.Core.csproj" />
   </ItemGroup>
 </Project>

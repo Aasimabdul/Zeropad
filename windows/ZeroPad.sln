@@ -4,6 +4,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Server", "ZeroPad.Server\ZeroPad.Server.csproj", "{CA2D4A82-21D0-4A86-A3C9-2A53DB77D1A1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Core", "ZeroPad.Core\ZeroPad.Core.csproj", "{5E1F7A10-3C2B-4D77-9A1E-6B0C2D4E8F11}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroPad.Server.Tests", "ZeroPad.Server.Tests\\ZeroPad.Server.Tests.csproj", "{BC4D70B4-8F2D-4B14-BD1A-2AB76A8FECF0}"
 EndProject
 Global
@@ -16,6 +18,10 @@ Global
   {CA2D4A82-21D0-4A86-A3C9-2A53DB77D1A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
   {CA2D4A82-21D0-4A86-A3C9-2A53DB77D1A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
   {CA2D4A82-21D0-4A86-A3C9-2A53DB77D1A1}.Release|Any CPU.Build.0 = Release|Any CPU
+  {5E1F7A10-3C2B-4D77-9A1E-6B0C2D4E8F11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {5E1F7A10-3C2B-4D77-9A1E-6B0C2D4E8F11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {5E1F7A10-3C2B-4D77-9A1E-6B0C2D4E8F11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+  {5E1F7A10-3C2B-4D77-9A1E-6B0C2D4E8F11}.Release|Any CPU.Build.0 = Release|Any CPU
   {BC4D70B4-8F2D-4B14-BD1A-2AB76A8FECF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
   {BC4D70B4-8F2D-4B14-BD1A-2AB76A8FECF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
   {BC4D70B4-8F2D-4B14-BD1A-2AB76A8FECF0}.Release|Any CPU.ActiveCfg = Release|Any CPU

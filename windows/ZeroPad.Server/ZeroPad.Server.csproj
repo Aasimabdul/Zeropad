@@ -4,8 +4,15 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>ZeroPad</AssemblyName>
+    <RootNamespace>ZeroPad.Server</RootNamespace>
+    <Version>0.1.0</Version>
+    <Product>ZeroPad Companion</Product>
+    <ApplicationIcon>zeropad.ico</ApplicationIcon>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+    <ProjectReference Include="../ZeroPad.Core/ZeroPad.Core.csproj" />
   </ItemGroup>
 </Project>

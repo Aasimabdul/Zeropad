@@ -1,209 +1,76 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 
 namespace ZeroPad.Server;
 
 internal static class Program
 {
-    private const int WifiPort = 26760;
-    private const int UsbTcpPort = 26761;
-    private static readonly TimeSpan SessionIdleTimeout = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan InputTimeout = TimeSpan.FromSeconds(1);
-
-    public static async Task Main()
+    public static int Main()
     {
-        Console.WriteLine("ZeroPad Windows companion — authenticated Wi-Fi + ADB-reverse prototype");
-        Console.WriteLine("Use only on a trusted private LAN. Do not forward UDP port 26760 to the internet.");
+        Console.Title = "ZeroPad Companion";
+        try { return Run(); }
+        catch (Exception ex)
+        {
+            Console.WriteLine();
+            Console.WriteLine(ex is SocketException
+                ? "Could not open the ZeroPad ports (26760 UDP / 26761 TCP). Is ZeroPad already running?"
+                : $"ZeroPad stopped: {ex.Message}");
+            Console.WriteLine("Press Enter to close.");
+            Console.ReadLine();
+            return 1;
+        }
+    }
 
-        var key = LoadOrCreatePairingKey();
-        Console.WriteLine($"Pairing key (enter this in Android): {Convert.ToBase64String(key)}");
-        Console.WriteLine($"Wi-Fi: authenticated UDP on port {WifiPort}.");
-        Console.WriteLine($"USB: run adb reverse tcp:{UsbTcpPort} tcp:{UsbTcpPort} with USB debugging enabled.");
+    private static int Run()
+    {
+        Console.WriteLine("ZeroPad Companion 0.1.0");
+        Console.WriteLine("Use only on a trusted private network. Never forward UDP 26760 to the internet.");
+        Console.WriteLine();
 
-        VirtualController? controller = null;
+        var key = PairingKey.LoadOrCreate();
+        IPadSink? pad = null;
         try
         {
-            controller = new VirtualController();
-            Console.WriteLine("Virtual Xbox 360 controller connected.");
+            pad = new VirtualController();
+            Console.WriteLine("Virtual Xbox 360 controller: READY (check joy.cpl).");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Virtual controller unavailable: {ex.GetType().Name}. Input will be diagnostic-only until a compatible driver is installed.");
+            Console.WriteLine($"Virtual Xbox 360 controller: NOT AVAILABLE ({ex.GetType().Name}).");
+            Console.WriteLine("Install the ViGEmBus driver, then restart ZeroPad: https://github.com/nefarius/ViGEmBus/releases");
+            Console.WriteLine("Until then input is accepted for diagnostics only; games will not see a controller.");
         }
 
-        using var stop = new CancellationTokenSource();
-        using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, WifiPort));
-        var tcpListener = new TcpListener(IPAddress.Loopback, UsbTcpPort);
-        tcpListener.Start();
-        Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+        var host = new ControllerHost(key, pad, log: line => Console.WriteLine(line));
+        using var server = new ZeroPadServer(host, log: line => Console.WriteLine(line));
+        server.Start();
 
-        var gate = new object();
-        Guid? activeSession = null;
-        long lastSequence = -1;
-        var lastSeen = DateTimeOffset.MinValue;
-        var inputNeutral = true;
+        Console.WriteLine();
+        Console.WriteLine("Enter these in the ZeroPad phone app:");
+        var addresses = LocalAddresses();
+        Console.WriteLine($"  PC address : {(addresses.Count > 0 ? string.Join("  or  ", addresses) : "(no network found)")}");
+        Console.WriteLine($"  Pairing key: {Convert.ToBase64String(key)}");
+        Console.WriteLine();
+        Console.WriteLine($"Wi-Fi: UDP {server.WifiPort}. USB: run  adb reverse tcp:{server.UsbPort} tcp:{server.UsbPort}");
+        Console.WriteLine("Press Ctrl+C to quit.");
 
-        byte[] ProcessPacket(byte[] bytes)
-        {
-            var packet = AuthenticatedPacket.Parse(bytes, key, DateTimeOffset.UtcNow);
-            var state = packet.State;
-            lock (gate)
-            {
-                var now = DateTimeOffset.UtcNow;
-                if (activeSession == packet.Session && state.Sequence <= lastSequence)
-                    throw new FormatException("Stale sequence.");
-                if (activeSession is not null && activeSession != packet.Session &&
-                    now - lastSeen <= SessionIdleTimeout)
-                    throw new FormatException("Another controller session is active.");
-
-                activeSession = packet.Session;
-                lastSequence = state.Sequence;
-                lastSeen = now;
-                try { controller?.Apply(state); }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Virtual controller failed: {ex.GetType().Name}; disabling virtual output.");
-                    try { controller?.Dispose(); } catch { }
-                    controller = null;
-                }
-                inputNeutral = false;
-            }
-
-            var virtualOutput = controller is not null;
-            var ackMac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"ack\n{packet.Session:D}\n{state.Sequence}\n{virtualOutput.ToString().ToLowerInvariant()}"));
-            return JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                type = "ack",
-                session = packet.Session.ToString("D"),
-                sequence = state.Sequence,
-                mac = Convert.ToBase64String(ackMac),
-                virtualOutput
-            });
-        }
-
-        var tcpTask = AcceptTcpClientsAsync(tcpListener, ProcessPacket, stop.Token);
-        var watchdog = Task.Run(async () =>
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
-            try
-            {
-                while (await timer.WaitForNextTickAsync(stop.Token))
-                {
-                    lock (gate)
-                    {
-                        if (inputNeutral || DateTimeOffset.UtcNow - lastSeen <= InputTimeout) continue;
-                        try { controller?.Reset(); } catch { }
-                        inputNeutral = true;
-                        activeSession = null;
-                        lastSequence = -1;
-                        Console.WriteLine("Input timeout: controller state reset.");
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-        }, stop.Token);
-
-        try
-        {
-            while (!stop.IsCancellationRequested)
-            {
-                UdpReceiveResult datagram;
-                try { datagram = await udp.ReceiveAsync(stop.Token); }
-                catch (OperationCanceledException) { break; }
-
-                try
-                {
-                    var ack = ProcessPacket(datagram.Buffer);
-                    await udp.SendAsync(ack, datagram.RemoteEndPoint, stop.Token);
-                }
-                catch (Exception ex) when (ex is JsonException or FormatException or ArgumentException or InvalidOperationException or CryptographicException)
-                {
-                    Console.WriteLine($"Rejected Wi-Fi input: {ex.Message}");
-                }
-                catch (OperationCanceledException) when (stop.IsCancellationRequested) { break; }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Wi-Fi input processing error: {ex.GetType().Name}");
-                }
-            }
-        }
-        finally
-        {
-            stop.Cancel();
-            tcpListener.Stop();
-            try { await watchdog; } catch (OperationCanceledException) { }
-            try { await tcpTask; } catch (OperationCanceledException) { } catch (SocketException) { }
-            lock (gate) { try { controller?.Reset(); } catch { } }
-            controller?.Dispose();
-        }
+        using var quit = new ManualResetEventSlim();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; quit.Set(); };
+        quit.Wait();
+        return 0;
     }
 
-    private static async Task AcceptTcpClientsAsync(TcpListener listener, Func<byte[], byte[]> processPacket, CancellationToken token)
+    private static List<string> LocalAddresses()
     {
-        try
+        var list = new List<string>();
+        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
         {
-            while (!token.IsCancellationRequested)
-            {
-                var client = await listener.AcceptTcpClientAsync(token);
-                _ = HandleTcpClientAsync(client, processPacket, token);
-            }
+            if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) continue;
+            foreach (var ua in nic.GetIPProperties().UnicastAddresses)
+                if (ua.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ua.Address) && !ua.Address.ToString().StartsWith("169.254."))
+                    list.Add(ua.Address.ToString());
         }
-        catch (OperationCanceledException) { }
-        catch (SocketException) when (token.IsCancellationRequested) { }
-    }
-
-    private static async Task HandleTcpClientAsync(TcpClient client, Func<byte[], byte[]> processPacket, CancellationToken token)
-    {
-        using (client)
-        using (var stream = client.GetStream())
-        using (var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, leaveOpen: true))
-        using (var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, leaveOpen: true) { AutoFlush = true })
-        {
-            try
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    var line = await reader.ReadLineAsync(token);
-                    if (line is null) break;
-                    if (Encoding.UTF8.GetByteCount(line) > AuthenticatedPacket.MaximumBytes)
-                    {
-                        Console.WriteLine("Rejected oversized USB/ADB frame.");
-                        break;
-                    }
-
-                    try
-                    {
-                        var ack = processPacket(Encoding.UTF8.GetBytes(line));
-                        await writer.WriteLineAsync(Encoding.UTF8.GetString(ack));
-                    }
-                    catch (Exception ex) when (ex is JsonException or FormatException or ArgumentException or InvalidOperationException or CryptographicException)
-                    {
-                        Console.WriteLine($"Rejected USB/ADB input: {ex.Message}");
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-            catch (IOException) { }
-        }
-    }
-
-    private static byte[] LoadOrCreatePairingKey()
-    {
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ZeroPad");
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, "pairing.key");
-        if (File.Exists(path))
-        {
-            var existing = Convert.FromBase64String(File.ReadAllText(path).Trim());
-            if (existing.Length != 32) throw new InvalidDataException("Pairing key file must contain a 32-byte key. Delete it to generate a new key.");
-            return existing;
-        }
-
-        var key = RandomNumberGenerator.GetBytes(32);
-        File.WriteAllText(path, Convert.ToBase64String(key));
-        return key;
+        return list;
     }
 }

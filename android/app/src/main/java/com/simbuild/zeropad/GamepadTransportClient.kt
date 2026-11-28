@@ -1,7 +1,5 @@
 package com.simbuild.zeropad
 
-import android.os.SystemClock
-import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -13,6 +11,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Mac
@@ -32,6 +31,45 @@ internal data class GamepadSnapshot(
 
 internal data class AckResult(val received: Boolean, val roundTripMs: Long?, val virtualOutput: Boolean = false)
 
+/** The wire format from protocol/README.md, with no sockets, so it can be unit-tested. */
+internal object Protocol {
+    fun hmac(secret: ByteArray, data: ByteArray): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(secret, "HmacSHA256"))
+        return mac.doFinal(data)
+    }
+
+    fun payload(sequence: Long, s: GamepadSnapshot): String = JSONObject()
+        .put("version", 1)
+        .put("type", "state")
+        .put("sequence", sequence)
+        .put("buttons", JSONArray(s.buttons.sorted()))
+        .put("axes", JSONObject()
+            .put("leftX", s.leftX.toDouble())
+            .put("leftY", s.leftY.toDouble())
+            .put("rightX", s.rightX.toDouble())
+            .put("rightY", s.rightY.toDouble()))
+        .put("triggers", JSONObject()
+            .put("left", s.leftTrigger.toDouble())
+            .put("right", s.rightTrigger.toDouble()))
+        .toString()
+
+    /** Signs `session \n sentAt \n base64(payload)` with the pairing key. */
+    fun envelope(key: ByteArray, session: String, sentAt: Long, payloadJson: String): String {
+        val payload64 = Base64.getEncoder().encodeToString(payloadJson.toByteArray(Charsets.UTF_8))
+        val mac = hmac(key, "$session\n$sentAt\n$payload64".toByteArray(Charsets.UTF_8))
+        return JSONObject()
+            .put("session", session)
+            .put("sentAt", sentAt)
+            .put("payload", payload64)
+            .put("mac", Base64.getEncoder().encodeToString(mac))
+            .toString()
+    }
+
+    fun ackMac(key: ByteArray, session: String, sequence: Long, virtualOutput: Boolean): ByteArray =
+        hmac(key, "ack\n$session\n$sequence\n$virtualOutput".toByteArray(Charsets.UTF_8))
+}
+
 internal class GamepadTransportClient {
     companion object {
         const val WIFI_PORT = 26760
@@ -44,6 +82,7 @@ internal class GamepadTransportClient {
     private var tcpReader: BufferedReader? = null
     private var tcpWriter: BufferedWriter? = null
     private var address: InetAddress? = null
+    private var port = WIFI_PORT
     private var key: ByteArray? = null
     private var mode: TransportMode? = null
     private var session = UUID.randomUUID().toString()
@@ -51,16 +90,17 @@ internal class GamepadTransportClient {
     private val sendTimes = ConcurrentHashMap<Long, Long>()
 
     @Synchronized
-    fun connect(host: String, pairingKey: String, selectedMode: TransportMode) {
+    fun connect(host: String, pairingKey: String, selectedMode: TransportMode, portOverride: Int = 0) {
         close()
-        val decodedKey = Base64.decode(pairingKey.trim(), Base64.DEFAULT)
+        val decodedKey = Base64.getMimeDecoder().decode(pairingKey.trim())
         require(decodedKey.size == 32) { "Pairing key must decode to 32 bytes." }
 
         if (selectedMode == TransportMode.USB) {
             val socket = Socket()
             try {
                 socket.soTimeout = 250
-                socket.connect(InetSocketAddress("127.0.0.1", USB_PORT), 1500)
+                socket.tcpNoDelay = true
+                socket.connect(InetSocketAddress("127.0.0.1", if (portOverride > 0) portOverride else USB_PORT), 1500)
                 tcp = socket
                 tcpReader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
                 tcpWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
@@ -71,10 +111,11 @@ internal class GamepadTransportClient {
         } else {
             require(host.trim().isNotEmpty()) { "Enter the Windows host IP address." }
             val resolved = InetAddress.getByName(host.trim())
+            port = if (portOverride > 0) portOverride else WIFI_PORT
             val socket = DatagramSocket()
             try {
                 socket.soTimeout = 250
-                socket.connect(resolved, WIFI_PORT)
+                socket.connect(resolved, port)
                 udp = socket
                 address = resolved
             } catch (error: Exception) {
@@ -94,46 +135,21 @@ internal class GamepadTransportClient {
     fun send(snapshot: GamepadSnapshot) {
         val secret = key ?: return
         val currentSequence = sequence++
-        val nowNanos = SystemClock.elapsedRealtimeNanos()
-        sendTimes.entries.removeIf { nowNanos - it.value > 5_000_000_000L }
-        sendTimes[currentSequence] = nowNanos
+        val now = System.nanoTime()
+        sendTimes.entries.removeIf { now - it.value > 5_000_000_000L }
+        sendTimes[currentSequence] = now
 
-        val payload = JSONObject()
-            .put("version", 1)
-            .put("type", "state")
-            .put("sequence", currentSequence)
-            .put("buttons", JSONArray(snapshot.buttons.sorted()))
-            .put("axes", JSONObject()
-                .put("leftX", snapshot.leftX.toDouble())
-                .put("leftY", snapshot.leftY.toDouble())
-                .put("rightX", snapshot.rightX.toDouble())
-                .put("rightY", snapshot.rightY.toDouble()))
-            .put("triggers", JSONObject()
-                .put("left", snapshot.leftTrigger.toDouble())
-                .put("right", snapshot.rightTrigger.toDouble()))
-            .toString()
-
-        val payloadBase64 = Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-        val sentAt = System.currentTimeMillis()
-        val signed = "$session\n$sentAt\n$payloadBase64".toByteArray(Charsets.UTF_8)
-        val mac = hmac(secret, signed)
-        val envelope = JSONObject()
-            .put("session", session)
-            .put("sentAt", sentAt)
-            .put("payload", payloadBase64)
-            .put("mac", Base64.encodeToString(mac, Base64.NO_WRAP))
-            .toString()
+        val envelope = Protocol.envelope(secret, session, System.currentTimeMillis(), Protocol.payload(currentSequence, snapshot))
+        val bytes = envelope.toByteArray(Charsets.UTF_8)
+        require(bytes.size <= MAX_DATAGRAM_BYTES) { "Controller message is too large." }
 
         when (mode) {
             TransportMode.WIFI -> {
                 val socket = udp ?: return
-                val bytes = envelope.toByteArray(Charsets.UTF_8)
-                require(bytes.size <= MAX_DATAGRAM_BYTES) { "Controller message is too large." }
-                socket.send(DatagramPacket(bytes, bytes.size, address, WIFI_PORT))
+                socket.send(DatagramPacket(bytes, bytes.size, address, port))
             }
             TransportMode.USB -> {
                 val writer = tcpWriter ?: return
-                require(envelope.toByteArray(Charsets.UTF_8).size <= MAX_DATAGRAM_BYTES) { "Controller message is too large." }
                 writer.write(envelope)
                 writer.newLine()
                 writer.flush()
@@ -160,11 +176,11 @@ internal class GamepadTransportClient {
             if (ack.optString("type") != "ack" || ack.optString("session") != session) return AckResult(false, null)
             val ackSequence = ack.optLong("sequence", -1L)
             val virtualOutput = ack.optBoolean("virtualOutput", false)
-            val supplied = Base64.decode(ack.optString("mac"), Base64.DEFAULT)
-            val expected = hmac(secret, "ack\n$session\n$ackSequence\n${virtualOutput.toString()}".toByteArray(Charsets.UTF_8))
+            val supplied = Base64.getMimeDecoder().decode(ack.optString("mac"))
+            val expected = Protocol.ackMac(secret, session, ackSequence, virtualOutput)
             if (!java.security.MessageDigest.isEqual(supplied, expected)) return AckResult(false, null)
             val sentNanos = sendTimes.remove(ackSequence)
-            val rtt = sentNanos?.let { ((SystemClock.elapsedRealtimeNanos() - it) / 1_000_000L).coerceAtLeast(0L) }
+            val rtt = sentNanos?.let { ((System.nanoTime() - it) / 1_000_000L).coerceAtLeast(0L) }
             AckResult(true, rtt, virtualOutput)
         } catch (_: java.net.SocketTimeoutException) {
             AckResult(false, null)
@@ -185,11 +201,5 @@ internal class GamepadTransportClient {
         key = null
         mode = null
         sendTimes.clear()
-    }
-
-    private fun hmac(secret: ByteArray, data: ByteArray): ByteArray {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret, "HmacSHA256"))
-        return mac.doFinal(data)
     }
 }
